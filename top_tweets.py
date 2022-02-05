@@ -11,7 +11,9 @@ import logging
 
 import psycopg2 #Writing 'top tweet' metadata to a shared Postgres database.
 
-#The TwitterDev search-tweets-python project does the work of managing the Tweet collection.
+# The TwitterDev search-tweets-python project does the work of managing the Tweet collection.
+# Local version has special code for Heroku deployment.
+
 from searchtweets import (ResultStream,
                           load_credentials,
                           merge_dicts,
@@ -22,12 +24,11 @@ from searchtweets import (ResultStream,
 # 'Some should be in a config thingy' items:
 ENGAGEMENTS_MINIMUM = 5
 MAX_TOP_TWEETS = 10
-FILE_DIR = './output'
-FILE_NAME = 'top_tweets.json'
-DATABASE_NAME = 'snowbot'
-TABLE_NAME = 'top_tweets'
+# FILE_DIR = './output'          Not doing any file handling on Heroku, just DB i/o.
+# FILE_NAME = 'top_tweets.json'
 
 # Just writing to a database.
+TABLE_NAME = os.getenv('TABLE_NAME', None)
 DATABASE = os.getenv('DATABASE', None)
 DATABASE_HOST = os.getenv('DATABASE_HOST', None)
 DATABASE_USER = os.getenv('DATABASE_USER', None)
@@ -38,7 +39,10 @@ logger = logging.getLogger()
 # --debug flag
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "ERROR"))
 
-REQUIRED_KEYS = {"query", "endpoint"}  #TODO: seems odd to have these details here in a library client.
+# REQUIRED_KEYS = {"query", "endpoint"}  #TODO: seems odd to have these details here in a library client.
+# With Heroku updates, no command line arguments are required.
+# Query is read in from ENV (and file), and over-written with command-line.
+REQUIRED_KEYS = {}
 
 def do_set_up(args_dict):
     if args_dict.get("debug") is True:
@@ -95,7 +99,17 @@ def parse_cmd_args():
     argparser.add_argument("--query",
                            dest="query",
                            default=None,
-                           help="Search query. (See: https://developer.twitter.com/en/docs/labs/recent-search/guides/search-queries)")
+                           help="Search query. ")
+
+    argparser.add_argument("--tweet-fields",
+                           dest="tweet_fields",
+                           default=None,
+                           help="Tweet fields of interest. ")
+
+    argparser.add_argument("--expansions",
+                           dest="expansions",
+                           default=None,
+                           help="Object expansions of interest. ")
 
     argparser.add_argument("--max-top-tweets",
                            dest="max_top_tweets",
