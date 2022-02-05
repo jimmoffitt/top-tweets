@@ -7,8 +7,8 @@ Module containing the various functions that are used for API calls,
 request payload generation, and related.
 """
 
-import re
 import datetime
+import os
 from dateutil.relativedelta import *
 import logging
 try:
@@ -134,8 +134,6 @@ def gen_request_parameters(query, granularity=None, results_per_call=None,
     if until_id:
         payload["until_id"] = until_id
 
-
-
     #Drop request parameters if this is a 'counts' request.
     if granularity:
         payload["granularity"] = granularity
@@ -214,6 +212,19 @@ def gen_params_from_config(config_dict):
 
     # This numeric parameter comes in as a string when it's parsed
     results_per_call = intify(config_dict.get("results_per_call", None))
+
+    # TODO: hardcoding for Heroku deploy
+
+    if results_per_call is None:
+        results_per_call = 500
+
+    if 'start_time' not in config_dict.keys():
+        config_dict['start_time'] = os.getenv('start_time', None)
+    if 'query' not in config_dict.keys():
+        config_dict['query'] = os.getenv('query', None)
+    if 'tweet_fields' not in config_dict.keys():
+        config_dict['tweet_fields'] = os.getenv('tweet_fields', None)
+
 
     query = gen_request_parameters(query=config_dict["query"],
                             granularity=config_dict.get("granularity", None),
