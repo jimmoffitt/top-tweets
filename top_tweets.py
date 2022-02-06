@@ -29,7 +29,7 @@ MAX_TOP_TWEETS = 10
 
 # Just writing to a database.
 TABLE_NAME = os.getenv('TABLE_NAME', None)
-DATABASE = os.getenv('DATABASE', None)
+DATABASE_NAME = os.getenv('DATABASE_NAME', None)
 DATABASE_HOST = os.getenv('DATABASE_HOST', None)
 DATABASE_USER = os.getenv('DATABASE_USER', None)
 DATABASE_PASSWORD = os.getenv('DATABASE_PASSWORD', None)
@@ -300,7 +300,7 @@ def write_to_database(top_tweets):
     try:
 
         #Create database connection.
-        con = psycopg2.connect(database=DATABASE, user=DATABASE_USER, password=DATABASE_PASSWORD, host=DATABASE_HOST, port="5432")
+        con = psycopg2.connect(database=DATABASE_NAME, user=DATABASE_USER, password=DATABASE_PASSWORD, host=DATABASE_HOST, port="5432")
         cur = con.cursor()
 
         # Delete current top tweets:
@@ -357,7 +357,7 @@ def main():
     for response in stream:
         tweets = response['data']
         total_tweets = total_tweets + len(tweets)
-        logger.debug(f"{len(tweets)} Tweets in response. ")
+        print(f"{len(tweets)} Tweets in response. ")
 
         engaged_tweets = add_up_engagements(tweets)
 
