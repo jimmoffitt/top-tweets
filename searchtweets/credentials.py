@@ -138,18 +138,29 @@ def load_credentials(filename=None,
         {'endpoint': 'https://endpoint'}
 
     """
-    yaml_key = yaml_key if yaml_key is not None else "search_tweets_v2"
-    filename = "~/.twitter_keys.yaml" if filename is None else filename
 
-    yaml_vars = _load_yaml_credentials(filename=filename, yaml_key=yaml_key)
-    if not yaml_vars:
-        logger.warning("Error parsing YAML file; searching for "
-                       "valid environment variables")
+    # TODO: No YAML import on Heroku
+
+    # yaml_key = yaml_key if yaml_key is not None else "search_tweets_v2"
+    # filename = "~/.twitter_keys_nope.yaml" if filename is None else filename
+
+    # yaml_vars = _load_yaml_credentials(filename=filename, yaml_key=yaml_key)
+    # if not yaml_vars:
+    #    logger.warning("Error parsing YAML file; searching for "
+    #                   "valid environment variables")
+
+    yaml_vars = {}
+
     env_vars = _load_env_credentials()
     merged_vars = (merge_dicts(yaml_vars, env_vars)
                    if env_overwrite
                    else merge_dicts(env_vars, yaml_vars))
     parsed_vars = _parse_credentials(merged_vars)
+
+
+    # TODO: Heroku, loading in from ENV
+    parsed_vars['bearer_token'] = os.getenv('bearer_token', None)
+
     return parsed_vars
 
 
