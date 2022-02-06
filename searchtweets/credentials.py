@@ -159,7 +159,7 @@ def load_credentials(filename=None,
 
 
     # TODO: Heroku, loading in from ENV
-    parsed_vars['bearer_token'] = os.getenv('bearer_token', None)
+    parsed_vars['bearer_token'] = os.getenv('SEARCHTWEETS_BEARER_TOKEN', None)
 
     return parsed_vars
 
