@@ -66,6 +66,8 @@ def do_set_up(args_dict):
     creds_dict = load_credentials(filename=args_dict["credential_file"],
                                   yaml_key=args_dict["credential_yaml_key"],
                                   env_overwrite=args_dict["env_overwrite"])
+    # Do checks and load in from ENV is missing...
+
 
     dict_filter = lambda x: {k: v for k, v in x.items() if v is not None}
 
@@ -305,14 +307,16 @@ def write_to_database(top_tweets):
         sql = 'DELETE FROM top_tweets;'
         cur.execute(sql)
         con.commit()
-        print("Deleted contents of top_tweet table...")
+        # print("Deleted contents of top_tweet table...")
 
         for tweet in top_tweets:
             sql = f"INSERT INTO top_tweets (tweet_id,score,likes,retweets,replies,quotes,updated_at) VALUES ({tweet['id']},{tweet['score']},{tweet['likes']},{tweet['retweets']},{tweet['replies']},{tweet['quotes']},'{strftime('%Y-%m-%d %H:%M:%S', gmtime())}');"
-            print(sql)
+            # print(sql)
             cur.execute(sql)
             con.commit()
             success = True
+
+        print('Wrote top Tweets to database top_tweets table... ')
 
     except Exception as e:
         message = f"Error with INSERT: {e}"
@@ -353,7 +357,7 @@ def main():
     for response in stream:
         tweets = response['data']
         total_tweets = total_tweets + len(tweets)
-        print(f"{len(tweets)} Tweets in response. ")
+        logger.debug(f"{len(tweets)} Tweets in response. ")
 
         engaged_tweets = add_up_engagements(tweets)
 
@@ -362,9 +366,9 @@ def main():
 
     top_tweets = sorted_tweets[:int(max_top_tweets)]
 
-    print(f"Top {max_top_tweets} Tweets:")
+    logger.debug(f"Top {max_top_tweets} Tweets:")
     for tweet in top_tweets:
-        print(f"{tweet['score']} engagements: https://twitter.com/author/status/{tweet['id']}")
+        logger.debug(f"{tweet['score']} engagements: https://twitter.com/author/status/{tweet['id']}")
 
     write_to_database(top_tweets)
     # write_output(sorted_tweets, f"{FILE_DIR}/{FILE_NAME}")
