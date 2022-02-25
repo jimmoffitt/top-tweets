@@ -1,3 +1,23 @@
+# This script collects Tweets that match a query, then surfaces a 'most relevant' Tweet to quote.
+# It makes requests to v2 Recent search and Post Tweets endpoints:
+#   * GET /2/tweets/search/recent query, start_time
+#   * POST /2/tweets text, quote_tweet_id
+#
+# This script uses 'relevancy' sorting to efficiently surface higher-engaged Tweets.
+# The script requests 100 Tweets per response, and, given the sort order, it assumes
+# the most relevant Tweets is included with the first response. For that reason, this
+# script does not paginate through search responses.
+#
+# Since the underlying search 'revelant ranking' model is evolving and will always have an
+# element of 'secret sauce' to rank relevance, there is an additional layer of ranking
+# performed by this script. This script ranks the *first page* of search results (the only
+# one requested) by their number of Likes and Retweets (these public metrics are available
+# Tweet attributes.
+#
+# Note: This script was written to run on Heroku. Instead of passing in settings and options
+# via the command-line, these inputs are read from the local environment and no command-line
+# options are supported.
+
 import requests
 from requests_oauthlib import OAuth1Session
 import os
@@ -5,51 +25,51 @@ import json
 import datetime
 from dateutil.relativedelta import *
 
-#The snowbot uses Twitter App 18554551 for searching and posting Retweets.
-
-#Retrieve authentication tokens.
-# Here, the @SnowbotDev consumer and user tokens needed to Retweet on behalf of the @SnowbotDev account.
+# Retrieve authentication tokens.
+# Here, the Author consumer and user tokens needed to Retweet on behalf of the Author's account.
 bot_consumer_key = os.environ.get("SNOWBOT_CONSUMER_KEY")
 bot_consumer_secret = os.environ.get("SNOWBOT_CONSUMER_SECRET")
-retweeter_access_token = os.environ.get("SNOWBOT_ACCESS_TOKEN")
-retweeter_access_secret = os.environ.get("SNOWBOT_ACCESS_SECRET")
+author_access_token = os.environ.get("SNOWBOT_ACCESS_TOKEN")
+author_access_secret = os.environ.get("SNOWBOT_ACCESS_SECRET")
 # Using search endpoint with App-level Bearer Token.
 search_bearer_token = os.environ.get("SEARCHTWEETS_BEARER_TOKEN")
 
-QUERY = os.environ.get("query")
-METRICS_MINIMUM = os.environ.get("metrics_minimum")
+def set_quote_text(query):
 
-def get_start_time():
-    num_hours = 24
-    timestamp = datetime.datetime.utcnow()
-    timestamp = (timestamp + relativedelta(hours=-num_hours))
-    return timestamp.strftime("%Y-%m-%dT%H:%M:%SZ")
+    # TODO: Change this up and make more dynamic...
 
-def quote_tweet(tweet_id):
+    text = f"Surfacing this Tweet with the v2 Recent search endpoint, sorting by relevancy. \n\nSearching for Tweets from the " \
+           f"last 24 hours that match this filter: #{query}"
 
-    quote_text = f"This Tweet was the most liked Tweet from the last 24 hours that matches this filter: #{QUERY}"
+    return text
 
+def quote_tweet(tweet_id, query):
+
+    quote_text = set_quote_text(query)
     payload = {"text": quote_text, "quote_tweet_id": tweet_id}
 
     # Make the request
     oauth = OAuth1Session(
         bot_consumer_key,
         client_secret=bot_consumer_secret,
-        resource_owner_key=retweeter_access_token,
-        resource_owner_secret=retweeter_access_secret
+        resource_owner_key=author_access_token,
+        resource_owner_secret=author_access_secret
     )
 
-    # Making the requestresponse = {Response} <Response [403]>
+    # Making the request...
     response = oauth.post(
         "https://api.twitter.com/2/tweets", json=payload
     )
 
+    if response.status_code != 200:
+        print(f"Response code: {response.status_code}")
+    #    raise Exception(
+    #        "Request returned an error: {} {}".format(response.status_code, response.text)
+    #    )
+
     return response
 
-def retweet(tweet_id):
-    # Be sure to replace your-user-id with your own user ID or one of an authenticating user
-    # You can find a user ID by using the user lookup endpoint
-    id = "906948460078698496" # <-- https://api.twitter.com/2/users/by/username/snowbotdev
+def retweet(author_id, tweet_id):
 
     # You can replace the given Tweet ID with your the Tweet ID you want to Retweet
     # You can find a Tweet ID by using the Tweet lookup endpoint
@@ -59,14 +79,20 @@ def retweet(tweet_id):
     oauth = OAuth1Session(
         bot_consumer_key,
         client_secret=bot_consumer_secret,
-        resource_owner_key=retweeter_access_token,
-        resource_owner_secret=retweeter_access_secret
+        resource_owner_key=author_access_token,
+        resource_owner_secret=author_access_secret
     )
 
-    # Making the requestresponse = {Response} <Response [403]>
+    # Making the request...
     response = oauth.post(
-        "https://api.twitter.com/2/users/{}/retweets".format(id), json=payload
+        "https://api.twitter.com/2/users/{}/retweets".format(author_id), json=payload
     )
+
+    if response.status_code != 200:
+        print(f"Response code: {response.status_code}")
+    #    raise Exception(
+    #        "Request returned an error: {} {}".format(response.status_code, response.text)
+    #    )
 
     return response
 
@@ -75,66 +101,57 @@ def bearer_oauth(r):
     Method required by bearer token authentication.
     """
     r.headers["Authorization"] = f"Bearer {search_bearer_token}"
-    r.headers["User-Agent"] = "@snowbotdev"
+    r.headers["User-Agent"] = "@SnowbotDev snowbot_retweets.py"
     return r
 
-def build_start_time():
-    start_time = ''
+def get_start_time(start_time_hours_ago):
+    timestamp = datetime.datetime.utcnow()
+    timestamp = (timestamp + relativedelta(hours=-int(start_time_hours_ago)))
+    return timestamp.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    return start_time
-
-def search_tweets():
+def search_tweets(query, start_time_hours_ago):
     search_url = "https://api.twitter.com/2/tweets/search/recent"
-    start_time = get_start_time()
-    #TODO: add 'start_time': start_time
-    query_params = {'query': QUERY, 'sort_order': 'relevancy','start_time': start_time, 'tweet.fields': 'public_metrics', 'max_results': 100}
+    start_time = get_start_time(start_time_hours_ago)
+    query_params = {'query': query, 'sort_order': 'relevancy','start_time': start_time, 'tweet.fields': 'public_metrics', 'max_results': 100}
     response = requests.get(search_url, auth=bearer_oauth, params=query_params)
 
-    print(response)
+    if response.status_code != 200:
+        print(f"Response code: {response.status_code}")
+    #    raise Exception(
+    #        "Request returned an error: {} {}".format(response.status_code, response.text)
+    #    )
 
     return response
 
 if __name__ == '__main__':
 
-    print("Making search request...")
-    response = search_tweets()
+    author_id = os.environ.get("AUTHOR_ID")
+    # Retreive some 'app' settings (things that would
+    query = os.environ.get("query")
+    metrics_minimum = os.environ.get("metrics_minimum")
+    start_time_hours_ago = os.environ.get("start_time_hours_ago")
 
-    # Parse response and grab first Tweet ID
-    json_object = json.loads(response.text)
+    print(f"Making search request with query: #{query}...")
+    response = search_tweets(query, start_time_hours_ago)
 
-    if 'data' in json_object.keys():
-        tweets = json_object['data']
+    # Cast response JSON into a dictionary.
+    response_dict = json.loads(response.text)
+
+    if 'data' in response_dict.keys():
+        tweets = response_dict['data']
 
         treshold_met = False
 
-        # For now, just sort by number of Likes.
-        tweets = sorted(tweets, key=lambda i: i['public_metrics']['like_count'], reverse=True)
+        # For now, just sort by number of Likes + Retweets.
+        tweets = sorted(tweets, key=lambda i: i['public_metrics']['like_count']+i['public_metrics']['retweet_count'] , reverse=True)
 
-        # for tweet in tweets:
-        #     metrics = tweet['public_metrics']
-        #     id = tweet['id']
-        #     total_metrics = metrics['retweet_count'] + metrics['reply_count'] + metrics['like_count'] + metrics['quote_count']
-        #     if total_metrics > int(METRICS_MINIMUM):
-        #         treshold_met = True
-        #         break
+        if (tweets[0]['public_metrics']['like_count']+ tweets[0]['public_metrics']['retweet_count']) > int(metrics_minimum):
+            treshold_met = True
 
-        id = tweets[0]['id']
-
-        #if treshold_met:
-        print(f"https://twitter.com/SnowBotDev/status/{id})")
-        #response = retweet(id)
-        response = quote_tweet(id)
+        if treshold_met:
+            print(f"https://twitter.com/SnowBotDev/status/{id})")
+            tweet_id = tweets[0]['id']
+            #response = retweet(author_id, tweet_id)
+            response = quote_tweet(tweet_id, query)
     else:
         print("No Tweets from search requests.")
-
-    #if response.status_code != 200:
-    #    raise Exception(
-    #        "Request returned an error: {} {}".format(response.status_code, response.text)
-    #    )
-
-    #print("Response code: {}".format(response.status_code))
-
-    # Saving the response as JSON
-    #json_response = response.json()
-    #print(json.dumps(json_response, indent=4, sort_keys=True))
-
