@@ -41,7 +41,7 @@ def set_quote_text(query):
     text = f"Surfacing this Tweet with the v2 Recent search endpoint, sorting by relevancy. \n\nSearching for Tweets from the " \
            f"last 24 hours that match this filter: #{query}"
 
-    text = "This is some new test text to quote with... "
+    #text = "This is some new test text to quote with... "
 
     return text
 
